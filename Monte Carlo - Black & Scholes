@@ -1,0 +1,65 @@
+import numpy as np
+import pandas as pd
+import yfinance
+
+data = yfinance.download(
+    tickers = 'VALE3.SA',
+    start = '2018-08-08',
+    interval = '1d',
+    treads = False
+)
+
+data['LogReturn'] = np.log(data['Adj Close'] / data['Adj Close'].shift(1)) # Retorno Logarizado
+data['Volatility'] = data['LogReturn'].rolling(21).std()*np.sqrt(252)
+
+## https://opcoes.net.br/opcoes2/bovespa/
+
+
+#### Monte Carlo ####
+
+def preco_otimo(S0, K, T, r, sigma, I):
+    
+    # K = strike da opção
+    # SO = Valor da ação
+    # T = dias que faltam para o vencimento
+    # r = taxa livre de risco
+    # sigma = Volatilidade
+    # I = Número de simulações
+    
+    z = np.random.standard_normal(I)
+    ST = S0 * np.exp((r - 0.5 * sigma ** 2) * T + sigma * np.sqrt(T) * z)
+    hT = np.maximum(ST - K, 0) # valores internos na maturidade
+    
+    return np.exp(-r * T) * np.sum(hT)/I # Estimação de Monte Calor
+    
+    
+ #### Black-Scholes ####
+ 
+import scipy.stats as si
+import sympy as sy 
+from sympy.stats import Normal, cdf
+from sympy import init_printing
+init_printing()
+
+def euro_call(S0, K, T, r, sigma):
+    
+    d1 = (np.log(S0/K) + (r + 0.5* sigma **2)*T) / (sigma*np.sqrt(T))
+    d2 = (np.log(S0 / K) + (r - 0.5 * sigma ** 2) * T) / (sigma * np.sqrt(T))
+    
+    call = (S0 * si.norm.cdf(d1, 0.0, 1.0) - K * np.exp(-r * T) * si.norm.cdf(d2, 0.0, 1.0))
+    
+    return call
+    
+  
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
