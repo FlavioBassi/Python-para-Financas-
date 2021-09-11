@@ -1,0 +1,85 @@
+import pandas as pd 
+import numpy as np
+import yfinance as yf
+from matplotlib import pyplot as plt
+from sklearn.decomposition import PCA
+plt.style.use('fivethirtyeight')
+
+# Importando as ações
+
+ibovurl = "http://bvmf.bmfbovespa.com.br/indices/ResumoCarteiraTeorica.aspx?Indice=ibov&idioma=pt-br"
+ibrx = pd.read_html(ibovurl)
+
+# Selecionando apenas a columa dos tickers 
+
+tickers = ibrx[0][0:]['Código'].tolist()
+tickers.remove('Quantidade Teórica Total  Redutor')
+
+
+# Adicionando .SA em todas as ações
+
+for i in range(0, len(tickers)):
+    tickers[i] = tickers[i] + '.SA'
+    
+# Buscando no yahoo finance o preço de fechamento ajustado
+
+dataset = yf.download(tickers = tickers, start = '2019-01-01', end = '2021-06-30')['Adj Close']
+
+dataset = pd.DataFrame(dataset)
+
+
+# Limpando os dados - Vamos nos livrar das colunas com mais de 50% de valores ausentes
+
+missing_fractions = dataset.isnull().mean().sort_values(ascending=False)
+
+missing_fractions.head(10)
+
+drop_list = sorted(list(missing_fractions[missing_fractions > 0.50].index))
+
+dataset.drop(labels=drop_list, axis=1, inplace=True)
+dataset = dataset.fillna(method= 'ffill')
+
+# retornos logarizados
+
+rs = dataset.apply(np.log).diff(1)
+
+# PCA
+
+pca = PCA(10).fit(rs.fillna(0))
+pc1 = pd.Series(index=rs.columns, data=pca.components_[0]) # 0 = LOADING 1, 1 = LOADING 2....
+
+# Visualização da Variância Explicada
+
+pca.explained_variance_ratio_
+
+weights = abs(pc1)/sum(abs(pc1))
+myrs = (weights*rs).sum(1)
+myrs.cumsum().apply(np.exp).plot()
+
+# Baixando o IBOV
+
+prices = yf.download(['^BVSP'], start='2019-01-01', end = '2021-01-01')['Adj Close']
+
+# Comparação entre IBOV e PCA1
+
+rs_df = pd.concat([myrs, prices.apply(np.log).diff(1)], 1)
+rs_df.columns = ["PCA Portfolio", "S&P500"]
+
+rs_df.dropna().cumsum().apply(np.exp).plot(subplots=True, figsize=(10,6), grid=True, linewidth=3);
+plt.tight_layout()
+
+
+# 10 ações com maior peso no PCA do loading analisado
+
+pc1.nlargest(10)
+
+# Comparação do IBOV com a carteira de 5 e 10 ações do loading escolhido
+
+myrs = rs[pc1.nlargest(5).index].mean(1)
+myrs.cumsum().apply(np.exp).plot(figsize=(15,5), grid=True, linewidth=3, title='PCA 10 Portfolio vs. IBOV', color = 'darkblue')
+myrs1 = rs[pc1.nlargest(10).index].mean(1)
+myrs1.cumsum().apply(np.exp).plot(figsize=(15,5), grid=True, linewidth=3)
+prices['2019':].apply(np.log).diff(1).cumsum().apply(np.exp).plot(figsize=(10,6), grid=True, linewidth=3, color = 'black')
+plt.legend(['5 Ações', '10 Ações', 'IBOV'])
+
+plt.tight_layout()
