@@ -58,7 +58,7 @@ myrs.cumsum().apply(np.exp).plot()
 
 # Baixando o IBOV
 
-prices = yf.download(['^BVSP'], start='2019-01-01', end = '2021-01-01')['Adj Close']
+prices = yf.download(['^BVSP'], start='2019-01-01', end = '2021-06-30')['Adj Close']
 
 # Comparação entre IBOV e PCA1
 
